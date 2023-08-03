@@ -52,10 +52,80 @@ GROUP BY
     p.n_idprojeto, p.c_descr_projeto, p.n_iddepto;
 
 
-8- 
+8-   
+    8- 
 
-a- 
- teste 
+	 CREATE PROCEDURE CheckProjectErrors
+AS
+BEGIN
+    DECLARE @v_total_proj_cost NUMERIC(18, 2);
+    DECLARE @v_accomp_cost NUMERIC(18, 2);
+    DECLARE @v_total_cost_diff NUMERIC(18, 2);
+    DECLARE @v_diff_msg VARCHAR(1000);
+
+    DECLARE @proj_id INT;
+    DECLARE @proj_cost MONEY;
+    DECLARE @proj_start_date DATE;
+    DECLARE @proj_end_date DATE;
+
+    DECLARE project_cursor CURSOR FOR
+    SELECT n_idprojeto, n_custo, d_inicio, d_previsao_termino
+    FROM t_projeto;
+
+    OPEN project_cursor;
+    FETCH NEXT FROM project_cursor INTO @proj_id, @proj_cost, @proj_start_date, @proj_end_date;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- a) datas de acompanhamento fora das datas dos projetos
+        IF NOT EXISTS (
+                SELECT 1
+                FROM t_acompanhamento
+                WHERE idprojeto = @proj_id
+                AND (d_data < @proj_start_date OR d_data > @proj_end_date)
+        )
+        BEGIN
+            PRINT 'Error in Project ' + CAST(@proj_id AS VARCHAR) + ': Accompaniment dates outside project dates';
+        END
+
+        -- b) projetos que tiveram custos do acompanhamento acima do custo previsto
+        SELECT @v_accomp_cost = ISNULL(SUM(n_custo), 0)
+        FROM t_acompanhamento
+        WHERE idprojeto = @proj_id;
+
+        IF @v_accomp_cost > @proj_cost
+        BEGIN
+            PRINT 'Error in Project ' + CAST(@proj_id AS VARCHAR) + ': Accompaniment costs exceed projected cost';
+        END
+
+        -- c) projetos que atrasaram 
+        IF GETDATE() > @proj_end_date
+        BEGIN
+            PRINT 'Warning in Project ' + CAST(@proj_id AS VARCHAR) + ': Project is delayed';
+        END
+
+        -- d) informe as diferenças entre o custo do projeto e os gastos dos acompanhamentos - mostrando a (o que ainda tem em caixa para o projeto ou o que ultrapassou o valor esperado)
+        SET @v_total_proj_cost = @proj_cost;
+        SET @v_total_cost_diff = @v_total_proj_cost - @v_accomp_cost;
+
+        IF @v_total_cost_diff >= 0
+        BEGIN
+            SET @v_diff_msg = 'Remaining budget for Project ' + CAST(@proj_id AS VARCHAR) + ': $' + CAST(@v_total_cost_diff AS VARCHAR);
+        END
+        ELSE
+        BEGIN
+            SET @v_diff_msg = 'Project ' + CAST(@proj_id AS VARCHAR) + ' exceeded budget by $' + CAST(ABS(@v_total_cost_diff) AS VARCHAR);
+        END
+
+        PRINT @v_diff_msg;
+
+        FETCH NEXT FROM project_cursor INTO @proj_id, @proj_cost, @proj_start_date, @proj_end_date;
+    END
+
+    CLOSE project_cursor;
+    DEALLOCATE project_cursor;
+END;
+EXEC CheckProjectErrors;
 
 
 
