@@ -1,0 +1,61 @@
+1- select * from t_funcionarios 
+
+
+2- SELECT f.*
+FROM t_funcionarios f
+JOIN t_departamento_funcionario df ON f.n_idfuncionario = df.n_idfuncionario
+JOIN t_departamento d ON df.n_iddepto = d.n_iddepto
+WHERE d.c_nomedepto = 'CONSTRUCAO';
+
+
+
+
+3- SELECT *FROM t_departamento  
+JOIN t_funcionarios ON n_idfuncionario_responsavel = n_idfuncionario
+WHERE c_nomefuncionario = 'ANTONIO JOSE';
+
+
+4- SELECT n_idprojeto, c_descr_projeto, n_custo
+FROM t_projeto;
+
+
+5-SELECT n_idprojeto, c_descr_projeto, d_fim
+FROM t_projeto
+WHERE d_fim IS NOT NULL;
+
+
+6- SELECT 
+    p.n_idprojeto,
+    p.c_descr_projeto,
+    p.n_iddepto,
+    SUM(a.n_custo) AS custo_previsto
+FROM 
+    t_projeto p
+LEFT JOIN 
+    t_acompanhamento a ON p.n_idprojeto = a.idprojeto
+GROUP BY 
+    p.n_idprojeto, p.c_descr_projeto, p.n_iddepto;
+
+
+
+
+7-SELECT
+    p.n_idprojeto,
+    p.c_descr_projeto,
+    p.n_iddepto,
+    COALESCE(SUM(a.n_custo), '0') AS custo_acompanhamento
+FROM
+    t_projeto p
+LEFT JOIN
+    t_acompanhamento a ON p.n_idprojeto = a.idprojeto
+GROUP BY
+    p.n_idprojeto, p.c_descr_projeto, p.n_iddepto;
+
+
+8- 
+
+a- 
+ 
+
+
+
