@@ -53,27 +53,25 @@ GROUP BY
 
 
 8-   
-    8- 
-
-	 CREATE PROCEDURE CheckProjectErrors
+     CREATE PROCEDURE VerificarErrosProjeto
 AS
 BEGIN
-    DECLARE @v_total_proj_cost NUMERIC(18, 2);
-    DECLARE @v_accomp_cost NUMERIC(18, 2);
-    DECLARE @v_total_cost_diff NUMERIC(18, 2);
-    DECLARE @v_diff_msg VARCHAR(1000);
+    DECLARE @v_total_custo_proj NUMERIC(18, 2);
+    DECLARE @v_custo_acompanhamento NUMERIC(18, 2);
+    DECLARE @v_total_diferenca_custo NUMERIC(18, 2);
+    DECLARE @v_msg_diferenca VARCHAR(1000);
 
-    DECLARE @proj_id INT;
-    DECLARE @proj_cost MONEY;
-    DECLARE @proj_start_date DATE;
-    DECLARE @proj_end_date DATE;
+    DECLARE @id_projeto INT;
+    DECLARE @custo_projeto MONEY;
+    DECLARE @data_inicio_projeto DATE;
+    DECLARE @data_fim_projeto DATE;
 
-    DECLARE project_cursor CURSOR FOR
+    DECLARE projeto_cursor CURSOR FOR
     SELECT n_idprojeto, n_custo, d_inicio, d_previsao_termino
     FROM t_projeto;
 
-    OPEN project_cursor;
-    FETCH NEXT FROM project_cursor INTO @proj_id, @proj_cost, @proj_start_date, @proj_end_date;
+    OPEN projeto_cursor;
+    FETCH NEXT FROM projeto_cursor INTO @id_projeto, @custo_projeto, @data_inicio_projeto, @data_fim_projeto;
 
     WHILE @@FETCH_STATUS = 0
     BEGIN
@@ -81,51 +79,55 @@ BEGIN
         IF NOT EXISTS (
                 SELECT 1
                 FROM t_acompanhamento
-                WHERE idprojeto = @proj_id
-                AND (d_data < @proj_start_date OR d_data > @proj_end_date)
+                WHERE idprojeto = @id_projeto
+                AND (d_data < @data_inicio_projeto OR d_data > @data_fim_projeto)
         )
         BEGIN
-            PRINT 'Error in Project ' + CAST(@proj_id AS VARCHAR) + ': Accompaniment dates outside project dates';
+            PRINT 'Erro no Projeto ' + CAST(@id_projeto AS VARCHAR) + ': Datas de acompanhamento fora das datas do projeto';
         END
 
         -- b) projetos que tiveram custos do acompanhamento acima do custo previsto
-        SELECT @v_accomp_cost = ISNULL(SUM(n_custo), 0)
+        SELECT @v_custo_acompanhamento = ISNULL(SUM(n_custo), 0)
         FROM t_acompanhamento
-        WHERE idprojeto = @proj_id;
+        WHERE idprojeto = @id_projeto;
 
-        IF @v_accomp_cost > @proj_cost
+        IF @v_custo_acompanhamento > @custo_projeto
         BEGIN
-            PRINT 'Error in Project ' + CAST(@proj_id AS VARCHAR) + ': Accompaniment costs exceed projected cost';
+            PRINT 'Erro no Projeto ' + CAST(@id_projeto AS VARCHAR) + ': Custos do acompanhamento excedem o custo previsto';
         END
 
         -- c) projetos que atrasaram 
-        IF GETDATE() > @proj_end_date
+        IF GETDATE() > @data_fim_projeto
         BEGIN
-            PRINT 'Warning in Project ' + CAST(@proj_id AS VARCHAR) + ': Project is delayed';
+            PRINT 'Aviso no Projeto ' + CAST(@id_projeto AS VARCHAR) + ': O projeto está atrasado';
         END
 
         -- d) informe as diferenças entre o custo do projeto e os gastos dos acompanhamentos - mostrando a (o que ainda tem em caixa para o projeto ou o que ultrapassou o valor esperado)
-        SET @v_total_proj_cost = @proj_cost;
-        SET @v_total_cost_diff = @v_total_proj_cost - @v_accomp_cost;
+        SET @v_total_custo_proj = @custo_projeto;
+        SET @v_total_diferenca_custo = @v_total_custo_proj - @v_custo_acompanhamento;
 
-        IF @v_total_cost_diff >= 0
+        IF @v_total_diferenca_custo >= 0
         BEGIN
-            SET @v_diff_msg = 'Remaining budget for Project ' + CAST(@proj_id AS VARCHAR) + ': $' + CAST(@v_total_cost_diff AS VARCHAR);
+            SET @v_msg_diferenca = 'Orçamento restante para o Projeto ' + CAST(@id_projeto AS VARCHAR) + ': R$' + CAST(@v_total_diferenca_custo AS VARCHAR);
         END
         ELSE
         BEGIN
-            SET @v_diff_msg = 'Project ' + CAST(@proj_id AS VARCHAR) + ' exceeded budget by $' + CAST(ABS(@v_total_cost_diff) AS VARCHAR);
+            SET @v_msg_diferenca = 'Projeto ' + CAST(@id_projeto AS VARCHAR) + ' ultrapassou o orçamento em R$' + CAST(ABS(@v_total_diferenca_custo) AS VARCHAR);
         END
 
-        PRINT @v_diff_msg;
+        PRINT @v_msg_diferenca;
 
-        FETCH NEXT FROM project_cursor INTO @proj_id, @proj_cost, @proj_start_date, @proj_end_date;
+        FETCH NEXT FROM projeto_cursor INTO @id_projeto, @custo_projeto, @data_inicio_projeto, @data_fim_projeto;
     END
 
-    CLOSE project_cursor;
-    DEALLOCATE project_cursor;
+    CLOSE projeto_cursor;
+    DEALLOCATE projeto_cursor;
 END;
-EXEC CheckProjectErrors;
+EXEC VerificarErrosProjeto;
+
+     
+
+	
 
 
 
